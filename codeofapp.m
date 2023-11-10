@@ -1,4 +1,4 @@
-classdef codeofapp < matlab.apps.AppBase
+classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
 
     % Properties that correspond to app components
     properties (Access = public)
@@ -204,6 +204,20 @@ classdef codeofapp < matlab.apps.AppBase
         PixelLineEditField              matlab.ui.control.NumericEditField
         PixelLineEditFieldLabel         matlab.ui.control.Label
         PostProcessingParametersTab     matlab.ui.container.Tab
+        InitialParametersTab            matlab.ui.container.Tab
+        DazzlerTriggerFreqkHzEditField  matlab.ui.control.NumericEditField
+        DazzlerTriggerFreqkHzEditFieldLabel  matlab.ui.control.Label
+        ystepspinnerEditField           matlab.ui.control.NumericEditField
+        ystepspinnerEditFieldLabel      matlab.ui.control.Label
+        xstepspinnerEditField           matlab.ui.control.NumericEditField
+        xstepspinnerEditFieldLabel      matlab.ui.control.Label
+        xyIncrementEditField            matlab.ui.control.NumericEditField
+        xyIncrementEditFieldLabel       matlab.ui.control.Label
+        ScanzoomfactorEditField         matlab.ui.control.NumericEditField
+        ScanzoomfactorEditFieldLabel    matlab.ui.control.Label
+        ChannelsDisplayListBox          matlab.ui.control.ListBox
+        ChannelsDisplayListBoxLabel     matlab.ui.control.Label
+        Panel                           matlab.ui.container.Panel
     end
 
 
@@ -563,19 +577,24 @@ classdef codeofapp < matlab.apps.AppBase
             app.FrameRateEditField.Value=app.hSI.hRoiManager.scanFrameRate;
             app.PixelDwelltimeEditField.Value=app.hSI.hScan2D.scanPixelTimeMean*1e9;
             app.hSI.hRoiManager.scanZoomFactor=3798./str2double(app.FoVmEditField.Value);
+            %TEST : app.hSI.hRoiManager.scanZoomFactor = app.ScanzoomfactorEditField.Value;
 
             % GUI parameters
             app.hSI.hChannels.channelDisplay=[2 3 4 ];
+            %TEST : app.hSI.hChannels.channelDisplay=app.ChannelsDisplayListBox.Value;
             app.initialize_Acq_panel(app)
 
             % startup parameters
             assignin('base', 'Xpos', app.XposSpinner.Value)
             assignin('base', 'Ypos', app.YposSpinner.Value)
             app.hSICtl.hMotorControls.xyIncrement = 10;
+            %TEST : app.hSICtl.hMotorControls.xyIncrement = app.xyIncrementEditField.Value;
             app.XposSpinner.Value=app.hSI.hMotors.samplePosition(1);
             app.YposSpinner.Value=app.hSI.hMotors.samplePosition(2);
             app.XposSpinner.Step = 10;
+            %TEST :  app.XposSpinner.Step = app.xstepspinnerEditField.Value;
             app.YposSpinner.Step = 10;
+            %TEST :  app.YposSpinner.Step = app.ystepspinnerEditField.Value;
             app.NyEditField_2.Value=app.hSI.hRoiManager.linesPerFrame;
             app.NxEditField_2.Value=app.hSI.hRoiManager.pixelsPerLine;
             app.NtEditField_2.Value=1;
@@ -583,6 +602,7 @@ classdef codeofapp < matlab.apps.AppBase
             app.PixelBinFactorEditField_3.Value=app.hSI.hScan2D.pixelBinFactor;
             app.PixelDwelltimeEditField_3.Value=app.hSI.hScan2D.scanPixelTimeMean*1e9;
             app.DazzlerTriggerFreqkHzEditField_2.Value=0;
+            % TEST: app.DazzlerTriggerFreqkHzEditField_2.Value=app.DazzlerTriggerFreqkHzEditField.Value;
 
             % Ticks :
             app.hSI.hRoiManager.forceSquarePixelation=0;
@@ -2489,6 +2509,77 @@ classdef codeofapp < matlab.apps.AppBase
             app.PostProcessingParametersTab = uitab(app.TabGroup);
             app.PostProcessingParametersTab.AutoResizeChildren = 'off';
             app.PostProcessingParametersTab.Title = 'Post Processing Parameters';
+
+            % Create InitialParametersTab
+            app.InitialParametersTab = uitab(app.TabGroup);
+            app.InitialParametersTab.Title = 'Initial Parameters';
+
+            % Create Panel
+            app.Panel = uipanel(app.InitialParametersTab);
+            app.Panel.Position = [41 707 118 124];
+
+            % Create ChannelsDisplayListBoxLabel
+            app.ChannelsDisplayListBoxLabel = uilabel(app.InitialParametersTab);
+            app.ChannelsDisplayListBoxLabel.HorizontalAlignment = 'right';
+            app.ChannelsDisplayListBoxLabel.Position = [50 808 98 22];
+            app.ChannelsDisplayListBoxLabel.Text = 'Channels Display';
+
+            % Create ChannelsDisplayListBox
+            app.ChannelsDisplayListBox = uilistbox(app.InitialParametersTab);
+            app.ChannelsDisplayListBox.Items = {'1', '2', '3', '4'};
+            app.ChannelsDisplayListBox.Multiselect = 'on';
+            app.ChannelsDisplayListBox.Position = [75 726 40 76];
+            app.ChannelsDisplayListBox.Value = {'1', '2', '3'};
+
+            % Create ScanzoomfactorEditFieldLabel
+            app.ScanzoomfactorEditFieldLabel = uilabel(app.InitialParametersTab);
+            app.ScanzoomfactorEditFieldLabel.HorizontalAlignment = 'right';
+            app.ScanzoomfactorEditFieldLabel.Position = [41 645 98 22];
+            app.ScanzoomfactorEditFieldLabel.Text = 'Scan zoom factor';
+
+            % Create ScanzoomfactorEditField
+            app.ScanzoomfactorEditField = uieditfield(app.InitialParametersTab, 'numeric');
+            app.ScanzoomfactorEditField.Position = [154 645 86 22];
+
+            % Create xyIncrementEditFieldLabel
+            app.xyIncrementEditFieldLabel = uilabel(app.InitialParametersTab);
+            app.xyIncrementEditFieldLabel.HorizontalAlignment = 'right';
+            app.xyIncrementEditFieldLabel.Position = [41 613 101 22];
+            app.xyIncrementEditFieldLabel.Text = 'xy Increment';
+
+            % Create xyIncrementEditField
+            app.xyIncrementEditField = uieditfield(app.InitialParametersTab, 'numeric');
+            app.xyIncrementEditField.Position = [157 613 86 22];
+
+            % Create xstepspinnerEditFieldLabel
+            app.xstepspinnerEditFieldLabel = uilabel(app.InitialParametersTab);
+            app.xstepspinnerEditFieldLabel.HorizontalAlignment = 'right';
+            app.xstepspinnerEditFieldLabel.Position = [35 548 101 22];
+            app.xstepspinnerEditFieldLabel.Text = 'x step spinner';
+
+            % Create xstepspinnerEditField
+            app.xstepspinnerEditField = uieditfield(app.InitialParametersTab, 'numeric');
+            app.xstepspinnerEditField.Position = [151 548 35 22];
+
+            % Create ystepspinnerEditFieldLabel
+            app.ystepspinnerEditFieldLabel = uilabel(app.InitialParametersTab);
+            app.ystepspinnerEditFieldLabel.HorizontalAlignment = 'right';
+            app.ystepspinnerEditFieldLabel.Position = [35 515 101 22];
+            app.ystepspinnerEditFieldLabel.Text = 'y step spinner';
+
+            % Create ystepspinnerEditField
+            app.ystepspinnerEditField = uieditfield(app.InitialParametersTab, 'numeric');
+            app.ystepspinnerEditField.Position = [151 515 35 22];
+
+            % Create DazzlerTriggerFreqkHzEditFieldLabel
+            app.DazzlerTriggerFreqkHzEditFieldLabel = uilabel(app.InitialParametersTab);
+            app.DazzlerTriggerFreqkHzEditFieldLabel.HorizontalAlignment = 'right';
+            app.DazzlerTriggerFreqkHzEditFieldLabel.Position = [39 475 140 22];
+            app.DazzlerTriggerFreqkHzEditFieldLabel.Text = 'DazzlerTriggerFreq (kHz)';
+
+            % Create DazzlerTriggerFreqkHzEditField
+            app.DazzlerTriggerFreqkHzEditField = uieditfield(app.InitialParametersTab, 'numeric');
+            app.DazzlerTriggerFreqkHzEditField.Position = [194 475 86 22];
 
             % Show the figure after all components are created
             app.UIFigure.Visible = 'on';
