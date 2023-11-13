@@ -627,6 +627,97 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             addpath(genpath('C:\Program Files\Vidrio\SI2022.0.0_2022-08-25-164140_29e163d768'))
             [app.hSI,app.hSICtl] = scanimage;
         end
+
+        function start_listener(app)
+            % Set our XYZ position to be the ones from scanImage and follow changes
+            addlistener(app.hSI.hMotors,'samplePosition','PostSet', @app.XposSpinner.ValueChangedFcn)
+
+            % Listener
+            app.FrameRate_listener = listener(app.hSI.hRoiManager,'scanFrameRate','PostSet', @(src, evt) app.update_field(app.FrameRateEditField,'Value', app.hSI.hRoiManager.scanFrameRate));
+            app.Acq_state_listener = listener(app.hSI,'acqState','PreSet', @(src, evt) app.update_value(app,'Acq_Pre', app.hSI.acqState));
+            app.Acq_state_listenerGUI=listener(app.hSI,'acqState','PostSet', @(src, evt) app.acquisition_state(app));
+            app.Channel_listener = listener(app.hSI.hStackManager,'framesDone','PostSet', @(src, evt) app.updateChannels(app));
+            app.Dwell_Time_listener= listener(app.hSI.hScan2D,'scanPixelTimeMean','PostSet', @(src, evt) app.update_field(app.PixelDwelltimeEditField_3,'Value', app.hSI.hScan2D.scanPixelTimeMean*1e9));
+            app.add_to_log(app,'Microscope Ready')
+        end
+    
+        function start_delay_lines(app)
+            % MECHANICAL DELAY LINES 
+            % Communicate and initialize the delay stage
+            
+            % Motor 1
+            try
+                app.delay_motor(1).motor = PI_C663_test();
+            catch exception
+                add_to_log(app,['Error detected: ' exception.message]);
+                add_to_log(app,'Error creating motor 1 class.');
+                app.PI_C663Button.BackgroundColor = 'r';
+            end
+
+            try
+                app.add_to_log(app, 'Initialize PI_C663');                
+                app.delay_motor(1).motor.init();
+            catch exception
+                add_to_log(app,['Error detected: ' exception.message]);
+                add_to_log(app,'Error starting motor 1.');
+                app.PI_C663Button.BackgroundColor = 'r';
+            end
+            
+            try
+                app.delay_motor(1).motor.goHome();
+            catch exception
+                add_to_log(app,['Error detected: ' exception.message]);
+                add_to_log(app,'Error during the homing process of motor 1.');
+                app.PI_C663Button.BackgroundColor = 'r';
+            end
+
+            try
+                app.delay_motor(1).motor.set_overlap();
+                app.PI_C663Button.BackgroundColor = 'g';
+                app.add_to_log(app,'PI_C663 Ready !');
+            catch exception
+                add_to_log(app,['Error detected: ' exception.message]);
+                add_to_log(app,'Error in set overlap of motor 1.');
+                app.PI_C663Button.BackgroundColor = 'r';
+            end
+
+            % Motor 2
+            try
+                app.delay_motor(2).motor = app.Benchtop;
+            catch exception
+                add_to_log(app,['Error detected: ' exception.message]);
+                add_to_log(app,'Error creating motor 2 class.');
+                app.BenchtopButton.BackgroundColor = 'r';
+            end
+
+            try
+                app.add_to_log(app,'Initialize Benchtop');
+                app.delay_motor(2).motor.init();
+            catch exception
+                add_to_log(app,['Error detected: ' exception.message]);
+                add_to_log(app,'Error starting motor 2.');
+                app.BenchtopButton.BackgroundColor = 'r';
+            end
+
+            try
+                app.delay_motor(2).motor.goHome();
+            catch exception
+                add_to_log(app,['Error detected: ' exception.message]);
+                add_to_log(app,'Error during the homing process of motor 2.');
+                app.BenchtopButton.BackgroundColor = 'r';
+            end
+
+            try
+                app.delay_motor(1).motor.set_overlap();
+                app.BenchtopButton.BackgroundColor = 'g';
+                app.add_to_log(app,'Benchtop Ready !');
+            catch exception
+                add_to_log(app,['Error detected: ' exception.message]);
+                add_to_log(app,'Error in set overlap of motor 2.');
+                app.BenchtopButton.BackgroundColor = 'r';
+            end
+
+        end
     
         function add_to_log(app,string)
             if strcmp(app.LogTextArea.Value,'')
@@ -712,39 +803,11 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             app.liste_UIAxes=[app.XY_Image app.XY_Transmission app.UIAxes_4];
             app.updateChannels(app);
 
-            % Set our XYZ position to be the ones from scanImage and follow
-            % changes
-            addlistener(app.hSI.hMotors,'samplePosition','PostSet', @app.XposSpinner.ValueChangedFcn)
+            %TODO: Listener description
+            app.start_listener(app);
 
-            %% Listener
-
-            app.FrameRate_listener = listener(app.hSI.hRoiManager,'scanFrameRate','PostSet', @(src, evt) app.update_field(app.FrameRateEditField,'Value', app.hSI.hRoiManager.scanFrameRate));
-            app.Acq_state_listener = listener(app.hSI,'acqState','PreSet', @(src, evt) app.update_value(app,'Acq_Pre', app.hSI.acqState));
-            app.Acq_state_listenerGUI=listener(app.hSI,'acqState','PostSet', @(src, evt) app.acquisition_state(app));
-            app.Channel_listener = listener(app.hSI.hStackManager,'framesDone','PostSet', @(src, evt) app.updateChannels(app));
-            app.Dwell_Time_listener= listener(app.hSI.hScan2D,'scanPixelTimeMean','PostSet', @(src, evt) app.update_field(app.PixelDwelltimeEditField_3,'Value', app.hSI.hScan2D.scanPixelTimeMean*1e9));
-            app.add_to_log(app,'Microscope Ready')
-
-          %% MECHANICAL DELAY LINES 
-%           TO DO : TRY CATCH WITH KILLING THE CONNECTIONS AND RESTARTING
-%           THEM IF NEEDED
-           % Communicate and initialize the delay stage
-                        app.delay_motor(1).motor = PI_C663_test();
-                        app.delay_motor(2).motor = app.Benchtop;
-
-                        app.add_to_log(app,'Initialize Benchtop');
-                        app.delay_motor(2).motor.init();
-                        app.delay_motor(2).motor.goHome();                           
-                        app.delay_motor(2).motor.set_overlap();
-                        app.BenchtopButton.BackgroundColor = 'g';
-                        app.add_to_log(app,'Benchtop Ready !');
-                         
-                        app.add_to_log(app, 'Initialize PI_C663');
-                        app.delay_motor(1).motor.init();
-                        app.delay_motor(1).motor.goHome();
-                        app.delay_motor(1).motor.set_overlap();
-                        app.PI_C663Button.BackgroundColor = 'g';
-                        app.add_to_log(app,'PI_C663 Ready !');
+            %Delay lines initialisation
+            app.start_delay_lines(app);
 
         end
 
