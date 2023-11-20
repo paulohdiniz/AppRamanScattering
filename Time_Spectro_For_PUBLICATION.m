@@ -1,4 +1,4 @@
-classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
+classdef Time_Spectro_For_PUBLICATION < matlab.apps.AppBase
 
     % Properties that correspond to app components
     properties (Access = public)
@@ -13,6 +13,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         Menu_2                          matlab.ui.container.Menu
         TabGroup                        matlab.ui.container.TabGroup
         ImagingTab                      matlab.ui.container.Tab
+        ROIButton                       matlab.ui.control.Button
         ShowDazzlerwindowCheckBox       matlab.ui.control.CheckBox
         LogTextArea                     matlab.ui.control.TextArea
         LogTextAreaLabel                matlab.ui.control.Label
@@ -90,11 +91,26 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         HomeXButton                     matlab.ui.control.Button
         HomeDelayButton                 matlab.ui.control.Button
         HomeZButton                     matlab.ui.control.Button
+        Freq                            matlab.ui.control.UIAxes
         UIAxes_4                        matlab.ui.control.UIAxes
         XY_Image                        matlab.ui.control.UIAxes
         Time_average                    matlab.ui.control.UIAxes
         XY_Transmission                 matlab.ui.control.UIAxes
         ParametersTab                   matlab.ui.container.Tab
+        InitialParametersPanel          matlab.ui.container.Panel
+        Panel                           matlab.ui.container.Panel
+        ChannelsDisplayListBox          matlab.ui.control.ListBox
+        ChannelsDisplayListBoxLabel     matlab.ui.control.Label
+        DazzlerTriggerFreqkHzEditField  matlab.ui.control.NumericEditField
+        DazzlerTriggerFreqkHzEditFieldLabel  matlab.ui.control.Label
+        ystepspinnerEditField           matlab.ui.control.EditField
+        ystepspinnerEditFieldLabel      matlab.ui.control.Label
+        xstepspinnerEditField           matlab.ui.control.EditField
+        xstepspinnerEditFieldLabel      matlab.ui.control.Label
+        xyIncrementEditField            matlab.ui.control.EditField
+        xyIncrementEditFieldLabel       matlab.ui.control.Label
+        ScanzoomfactorEditField         matlab.ui.control.EditField
+        ScanzoomfactorEditFieldLabel    matlab.ui.control.Label
         TabGroup2                       matlab.ui.container.TabGroup
         WaveGeneratorTab                matlab.ui.container.Tab
         WaveGeneratorListBox_2          matlab.ui.control.ListBox
@@ -203,62 +219,41 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         LinesFrameEditFieldLabel        matlab.ui.control.Label
         PixelLineEditField              matlab.ui.control.NumericEditField
         PixelLineEditFieldLabel         matlab.ui.control.Label
-        PostProcessingParametersTab     matlab.ui.container.Tab
-        InitialParametersTab            matlab.ui.container.Tab
-        DazzlerTriggerFreqkHzEditField  matlab.ui.control.NumericEditField
-        DazzlerTriggerFreqkHzEditFieldLabel  matlab.ui.control.Label
-        ystepspinnerEditField           matlab.ui.control.NumericEditField
-        ystepspinnerEditFieldLabel      matlab.ui.control.Label
-        xstepspinnerEditField           matlab.ui.control.NumericEditField
-        xstepspinnerEditFieldLabel      matlab.ui.control.Label
-        xyIncrementEditField            matlab.ui.control.NumericEditField
-        xyIncrementEditFieldLabel       matlab.ui.control.Label
-        ScanzoomfactorEditField         matlab.ui.control.NumericEditField
-        ScanzoomfactorEditFieldLabel    matlab.ui.control.Label
-        ChannelsDisplayListBox          matlab.ui.control.ListBox
-        ChannelsDisplayListBoxLabel     matlab.ui.control.Label
-        Panel                           matlab.ui.container.Panel
     end
 
-
     properties (Access = public)
-        hSI % Scan image
-        hSICtl % Scan image controls
-        X_pos % Sample position extracted from hMotors of HSi (ScanImage)
-        Y_pos % Sample position extracted from hMotors of HSi (ScanImage)
-        Pix_equal_line_check
-        WG
-        resourceStore
-        waveformGenerators
-        liste_UIAxes
-        hpChannels %Contient les raw datas de toutes les channels 
-        wavename_DZ1
-        wavename_DZ2
-        FrameIsDone=0
-        waves_DZ
-        Acq_Pre
-        Acq_Post
-        Dz_freq_max=30e3; % Dazzler max trigger frequency
-        Fs_base=125e6; % AlazarTech Card max sampling
-        data_cube
-        Tdata_cube
+
+        %ScanImage
+        scanimage
+        scanimage_controls
+        is_pixel_line_equal
+        data_cube_raw
+        data_cube_transm
         trigger_data
         raman_data
-        transmission_data
+        transm_data
+
+        %mb in the protected?
+        liste_UI_axes
+        acq_pre
+        acq_post
+        fs_base=125e6; % AlazarTech Card max sampling
+
+        %Dazzle
+        dz_max_trig_freq=30e3; 
+        waves_dz
+
+        %WaveGenerators
+        waveform_generators
+        WG
         WG_digital
         WG_analog
-        WG_Chosen
+        WG_chosen
 
-        %% Saving
-        save_folder
-        save_path
-        save_name
-
-        %% Delay motor 
+        % Delay motor 
         delay_motor
         Benchtop = Benchtop_test();
         list_devices_benchtop = Benchtop.listdevices();  % List connected devices
-        motor_object_benchtop;% Create a motor object
         delay_PI % the delay extracted from the getPos of the PI motor
         flagdelay=2;
 
@@ -285,14 +280,54 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         function update_value(app,property,value)
             app.(property)=value;
         end
-    
+
+        function update_graphs(app)
+            % Set the bidirectionnal scan/square_pix/pix=line
+            app.scanimage.hScan2D.bidirectional=0;
+            app.scanimage.hRoiManager.forceSquarePixels=0;
+            app.is_pixel_line_equal=0;
+            app.scanimage.hRoiManager.forceSquarePixelation=0;
+
+            set_xy_image(app);
+            set_xy_transm(app);
+            set_uiaxes(app);
+            set_time_avg(app);
+            set_freq(app);
+
+        end
+
+        function set_xp_image(app)
+            app.NxEditField_2.Value=64;
+            app.NyEditField_2.Value=64;
+            app.NtEditField_2.Value=300;
+            app.XY_Image.YLim=[1 app.NyEditField_2.Value];
+            app.XY_Image.XLim=[1 app.NxEditField_2.Value*app.NtEditField_2.Value];
+            app.XY_Image.DataAspectRatio=[app.NtEditField_2.Value 1 1];
+        end
+
+        function set_xy_transm(app)
+            app.XY_Transmission.YLim=[1 app.NyEditField_2.Value];
+            app.XY_Transmission.XLim=[1 app.NxEditField_2.Value*app.NtEditField_2.Value];
+            app.XY_Transmission.DataAspectRatio=[app.NtEditField_2.Value 1 1];
+        end
+        function set_uiaxes(app)
+            % Condition on RAMAN ACTIVE
+            app.UIAxes_4.YLim=[1 app.NyEditField_2.Value];
+            app.UIAxes_4.XLim=[1 app.NxEditField_2.Value*app.NtEditField_2.Value];
+            app.UIAxes_4.DataAspectRatio=[app.NtEditField_2.Value 1 1];
+        end
+        function set_time_avg(app)
+        end
+        function set_freq(app)
+        end
+
         function Transmission_Button(app)
             Dz_freq=app.DazzlerTriggerFreqkHzEditField;
-            Pixel_dwell_time=1./min(Dz_freq,app.Dz_freq_max);
+            Pixel_dwell_time=1./min(Dz_freq,app.dz_max_trig_freq);
             Binning=1:40;
-            diviseur=1:Fs_base;
-            diviseur=diviseur(~(rem(Fs_base, diviseur)));
-            A=Binning.'*1./(Fs_base./diviseur(1:30));
+            diviseur=1:fs_base;
+            diviseur=diviseur(~(rem(fs_base, diviseur)));
+            A=Binning.'*1./(fs_base./diviseur(1:30));
             [i,j]=ind2sub(size(A),find(abs(A(:)-Pixel_dwell_time)==min(abs(A(:)-Pixel_dwell_time)),1));
             Freq_final=1./A(i,j);
             app.DazzlerTriggerFreqkHzEditField=Freq_final;
@@ -321,16 +356,16 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         function initialise_wave_gen(app)
            
             % Grab the wavegens and store them in the app
-            app.resourceStore =  evalin('base','dabs.resources.ResourceStore()');
-            app.waveformGenerators = app.resourceStore.filterByClass('dabs.generic.WaveformGenerator');
+            resource_store =  evalin('base','dabs.resources.ResourceStore()');
+            app.waveform_generators = resource_store.filterByClass('dabs.generic.WaveformGenerator');
     
             % Find the widgets
             temp_widget=dabs.resources.widget.WidgetBar();
             temp_wg_widget=temp_widget.hWidgets(cellfun(@(x) isa(x(:),'dabs.resources.widget.widgets.waveFormGeneratorWidget'),temp_widget.hWidgets));
             
-            if iscell(app.waveformGenerators)
-                for ii=1:size(app.waveformGenerators,2)
-                    app.WG(ii).wavegen = app.waveformGenerators{ii};
+            if iscell(app.waveform_generators)
+                for ii=1:size(app.waveform_generators,2)
+                    app.WG(ii).wavegen = app.waveform_generators{ii};
                     if strcmp(app.WG(ii).wavegen.taskType,'Analog')
                         app.WG(ii).path='C:\Program Files\Vidrio\SI2022.0.0_2022-08-25-164140_29e163d768\+dabs\+generic\+waveforms\+analog';
                     elseif strcmp(app.WG(ii).wavegen.taskType,'Digital')
@@ -341,7 +376,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
                     app.WG(ii).widget.redraw();
                 end
             else
-                app.WG = app.waveformGenerators;
+                app.WG = app.waveform_generators;
                 if strcmp(app.WG.wavegen.taskType,'Analog')
                     app.WG.path='C:\Program Files\Vidrio\SI2022.0.0_2022-08-25-164140_29e163d768\+dabs\+generic\+waveforms\+analog';
                 elseif strcmp(app.WG.wavegen.taskType,'Digital')
@@ -367,17 +402,17 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
                     app.WG_analog=[app.WG_analog ii];
                 end
             end
-            app.WG_Chosen=app.WG_digital;
+            app.WG_chosen=app.WG_digital;
         end
     
         %% FUNCTION FOR IMAGE GRABBING
         function updateChannels(app)
     
             % Data is plotted if necessary
-            if ((app.hSI.hStackManager.framesDone==0) && (strcmp(app.hSI.acqState,'grab'))) || (strcmp(app.hSI.acqState,'focus'))
+            if ((app.scanimage.hStackManager.framesDone==0) && (strcmp(app.scanimage.acqState,'grab'))) || (strcmp(app.scanimage.acqState,'focus'))
    
                 % Data is stored according to the state of the buttons :
-                clear app.trigger_data app.raman_data app.transmission_data app.data_cube app.Tdata_cube
+                clear app.trigger_data app.raman_data app.transm_data app.data_cube_raw app.data_cube_transm
     
                 % We look at the channels
                 channels_m=[str2num(app.channel_state(app.ChannelDropDown.Value)) str2num(app.channel_state(app.ChannelDropDown_2.Value)) str2num(app.channel_state(app.ChannelDropDown_3.Value))];
@@ -386,14 +421,14 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
                     list_bool=ismember([1 2 3 4],channels_m); % On regarde quelles channels sont demandés par l'app.
                     idx_bool = find(list_bool);   % liste qui contient
                     cell_channels={app.ChannelDropDown.Value,app.ChannelDropDown_2.Value,app.ChannelDropDown_3.Value};
-                    for ii = 1:size(app.liste_UIAxes,2)    % loop on the axis on
+                    for ii = 1:size(app.liste_UI_axes,2)    % loop on the axis on
                         if ~strcmp(cell_channels{ii}, 'Off')
                             Channel_asked=str2double(cell_channels{ii});
-                            indice=Channel_asked==app.hSI.hChannels.channelsActive;
-                            imagesc(app.liste_UIAxes(ii), (app.hSI.hDisplay.lastFrame{indice}));%\ dans scanimage, les raw datas se trouvent dans l'objet hSI.hDisplay.lastFrame{}
-                            xlim(app.liste_UIAxes(ii),[1 size((app.hSI.hDisplay.lastFrame{indice}),2)])
-                            ylim(app.liste_UIAxes(ii),[1 size((app.hSI.hDisplay.lastFrame{indice}),1)])
-                            daspect(app.liste_UIAxes(ii),'auto')
+                            indice=Channel_asked==app.scanimage.hChannels.channelsActive;
+                            imagesc(app.liste_UI_axes(ii), (app.scanimage.hDisplay.lastFrame{indice}));%\ dans scanimage, les raw datas se trouvent dans l'objet scanimage.hDisplay.lastFrame{}
+                            xlim(app.liste_UI_axes(ii),[1 size((app.scanimage.hDisplay.lastFrame{indice}),2)])
+                            ylim(app.liste_UI_axes(ii),[1 size((app.scanimage.hDisplay.lastFrame{indice}),1)])
+                            daspect(app.liste_UI_axes(ii),'auto')
                         end
                     end
                 catch
@@ -402,21 +437,21 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
     
                 if any(cellfun(@(x) strcmp(x,'Raman Active'),{{app.channel_state(app.ChannelDropDown.Value)},{(app.ChannelDropDown_2.Value)},{app.ChannelDropDown_3.Value}}))
                     app.raman_average_state=1;
-                    app.trigger_data=app.hSI.hDisplay.lastFrame{app.channel_mapping(app,str2num(app.TrigChannelDropDown.Value))}.';
-                    app.raman_data=app.hSI.hDisplay.lastFrame{app.channel_mapping(app,str2num(app.TimeChannelDropDown.Value))}.'; %#ok<*ST2NM>
-                    app.transmission_data=app.hSI.hDisplay.lastFrame{app.channel_mapping(app,str2num(app.TransmissionChannelDropDown.Value))}.'; %#ok<*ST2NM>                    
-                    app.data_cube=zeros(app.NyEditField_2.Value,app.NxEditField_2.Value,app.NtEditField_2.Value);
-                    app.Tdata_cube=zeros(app.NyEditField_2.Value,app.NxEditField_2.Value,app.NtEditField_2.Value);
+                    app.trigger_data=app.scanimage.hDisplay.lastFrame{app.channel_mapping(app,str2num(app.TrigChannelDropDown.Value))}.';
+                    app.raman_data=app.scanimage.hDisplay.lastFrame{app.channel_mapping(app,str2num(app.TimeChannelDropDown.Value))}.'; %#ok<*ST2NM>
+                    app.transm_data=app.scanimage.hDisplay.lastFrame{app.channel_mapping(app,str2num(app.TransmissionChannelDropDown.Value))}.'; %#ok<*ST2NM>                    
+                    app.data_cube_raw=zeros(app.NyEditField_2.Value,app.NxEditField_2.Value,app.NtEditField_2.Value);
+                    app.data_cube_transm=zeros(app.NyEditField_2.Value,app.NxEditField_2.Value,app.NtEditField_2.Value);
                     try
                         app.process_data(app)
                         
-                        temp=sum(abs(app.data_cube),3);
+                        temp=sum(abs(app.data_cube_raw),3);
                         imagesc(app.UIAxes_4, temp);
                         app.UIAxes_4.YLim=[1 app.NyEditField_2.Value];
                         app.UIAxes_4.XLim=[1 app.NxEditField_2.Value];
                         app.UIAxes_4.DataAspectRatio=[1 1 1];
-                        temp=squeeze(mean(app.data_cube,[1 2]));
-                        tempT=squeeze(mean(app.Tdata_cube,[1 2]));
+                        temp=squeeze(mean(app.data_cube_raw,[1 2]));
+                        tempT=squeeze(mean(app.data_cube_transm,[1 2]));
                         plot(app.Time_average,temp)
                         hold(app.Time_average,'on')                   
                         plot(app.Time_average,tempT./max(tempT(:)).*max(temp(:)))
@@ -438,14 +473,14 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
 
         function [channel_id]=channel_mapping(app,number)
             try
-            channel_id=find(app.hSI.hChannels.channelsActive==number);
+            channel_id=find(app.scanimage.hChannels.channelsActive==number);
             catch
                 app.add_to_log(app,'Trigger channel missing')
             end
         end
 
         function update_time_spectro_scan_image_XY(app,value)              
-            app.hSI.hRoiManager.pixelsPerLine=value*app.NxEditField_2.Value;
+            app.scanimage.hRoiManager.pixelsPerLine=value*app.NxEditField_2.Value;
             app.XY_Image.YLim=[1 app.NyEditField_2.Value];
             app.XY_Image.XLim=[1 app.NxEditField_2.Value*app.NtEditField_2.Value];
             app.XY_Image.DataAspectRatio=[app.NtEditField_2.Value 1 1];
@@ -456,8 +491,8 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
     
         %% DAZZLER FUNCTIONS
         function update_wave_DZ(app,field,value,dazz_num)
-            indice =cellfun(@(x) strcmp(x,field),app.waves_DZ(dazz_num).wave_fields);
-            app.waves_DZ(dazz_num).wave{indice}=[field '=' num2str(value,'%15.6f')];
+            indice =cellfun(@(x) strcmp(x,field),app.waves_dz(dazz_num).wave_fields);
+            app.waves_dz(dazz_num).wave{indice}=[field '=' num2str(value,'%15.6f')];
             % Write cell A into txt 
             app.text_write(dazz_num)
         end
@@ -469,10 +504,10 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             end
 
             for ii=1:numel(field)
-                indice =cellfun(@(x) strcmp(x,field{ii}),app.waves_DZ(dazz_num).wave_fields);
-                app.waves_DZ(dazz_num).wave{indice}=[field{ii} '=' num2str(value(ii),'%15.6f')];
+                indice =cellfun(@(x) strcmp(x,field{ii}),app.waves_dz(dazz_num).wave_fields);
+                app.waves_dz(dazz_num).wave{indice}=[field{ii} '=' num2str(value(ii),'%15.6f')];
             end
-            app.text_write(app,dazz_num,[app.waves_DZ(dazz_num).path '\wave_' num2str(dazz_num) '.txt'])
+            app.text_write(app,dazz_num,[app.waves_dz(dazz_num).path '\wave_' num2str(dazz_num) '.txt'])
         end
 
         function A=text_read(name)
@@ -489,7 +524,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         end
 
         function text_write(app,dazz_num,name)
-            A=app.waves_DZ(dazz_num).wave;
+            A=app.waves_dz(dazz_num).wave;
             fid = fopen(name,'w');
             % Write cell A into txt
             for i = 1:numel(A)
@@ -505,19 +540,19 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         function init_dazz_waves(app)
             % Init waves to update
             for ii=1:2
-                app.waves_DZ(ii).path=['C:\dazzler\data-' num2str(ii) '\Waves_for_remote_update'];
-                app.waves_DZ(ii).wave=app.text_read([app.waves_DZ(ii).path '\wave_' num2str(ii) '.txt']);
-                app.waves_DZ(ii).wave_fields=cellfun(@(x) x(1:strfind(x,'=')-1), app.waves_DZ(ii).wave(cellfun(@(x) isa(x,'char'),app.waves_DZ(ii).wave)) ,'UniformOutput',false);
+                app.waves_dz(ii).path=['C:\dazzler\data-' num2str(ii) '\Waves_for_remote_update'];
+                app.waves_dz(ii).wave=app.text_read([app.waves_dz(ii).path '\wave_' num2str(ii) '.txt']);
+                app.waves_dz(ii).wave_fields=cellfun(@(x) x(1:strfind(x,'=')-1), app.waves_dz(ii).wave(cellfun(@(x) isa(x,'char'),app.waves_dz(ii).wave)) ,'UniformOutput',false);
             end
             % Init fields in the app
             %DZ1
-            temp=app.text_read([app.waves_DZ(1).path '\wave_' num2str(0) '.txt']);
+            temp=app.text_read([app.waves_dz(1).path '\wave_' num2str(0) '.txt']);
             temp=cellfun(@(x) x(strfind(x,'=')+1:end), temp(cellfun(@(x) isa(x,'char'),temp)) ,'UniformOutput',false);
             temp=(cellfun(@str2num,temp,'UniformOutput',false));
             [app.PositionEditField.Value, app.BandwidthEditField.Value, app.HolePositionEditField.Value, app.HoleWidthEditField.Value, ...
                 app.HoleDepthSlider.Value, app.PowerSlider.Value, app.DelayEditField.Value, app.order2EditField.Value, app.order3EditField.Value, app.order4EditField_2.Value]=deal(temp{[2 3 4 5 6 18 8 9 10 11]});
             %DZ2
-            temp=app.text_read([app.waves_DZ(2).path '\wave_' num2str(0) '.txt']);
+            temp=app.text_read([app.waves_dz(2).path '\wave_' num2str(0) '.txt']);
             temp=cellfun(@(x) x(strfind(x,'=')+1:end),temp(cellfun(@(x) isa(x,'char'),temp)) ,'UniformOutput',false);
             temp=(cellfun(@str2num,temp,'UniformOutput',false));
             [app.PositionEditField_2.Value, app.BandwidthEditField_2.Value, app.HolePositionEditField_2.Value, app.HoleWidthEditField_2.Value, ...
@@ -542,73 +577,74 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
            
             switch app.raman_average_state
                 case 1
-                    temp_data_cube=zeros(app.NyEditField_2.Value*app.NxEditField_2.Value,app.NtEditField_2.Value);
-                    temp_Tdata_cube=zeros(app.NyEditField_2.Value*app.NxEditField_2.Value,app.NtEditField_2.Value);
+                    temp_data_cube_raw=zeros(app.NyEditField_2.Value*app.NxEditField_2.Value,app.NtEditField_2.Value);
+                    temp_data_cube_transm=zeros(app.NyEditField_2.Value*app.NxEditField_2.Value,app.NtEditField_2.Value);
                     temp=double((app.raman_data(:))).';
-                    tempT=double((app.transmission_data(:))).';
+                    tempT=double((app.transm_data(:))).';
                     trig_threshold=0.5;
                     shift=20;
                     [I]=app.find_trigger(abs(app.trigger_data(:)),shift,app.NtEditField_2.Value,trig_threshold);
                     for jj=1:length(I)-1
-                        temp_data_cube(jj,:)=temp((I(jj)-shift):(I(jj)+app.NtEditField_2.Value-shift-1));
-                        temp_Tdata_cube(jj,:)=tempT((I(jj)-shift):(I(jj)+app.NtEditField_2.Value-shift-1));
+                        temp_data_cube_raw(jj,:)=temp((I(jj)-shift):(I(jj)+app.NtEditField_2.Value-shift-1));
+                        temp_data_cube_transm(jj,:)=tempT((I(jj)-shift):(I(jj)+app.NtEditField_2.Value-shift-1));
                     end
-                    temp_data_cube(app.NyEditField_2.Value*app.NxEditField_2.Value,:)=zeros(1,app.NtEditField_2.Value);
-                    temp_Tdata_cube(app.NyEditField_2.Value*app.NxEditField_2.Value,:)=zeros(1,app.NtEditField_2.Value);
-                    app.data_cube=reshape(temp_data_cube,[app.hSI.hRoiManager.pixelsPerLine/app.NtEditField_2.Value app.hSI.hRoiManager.linesPerFrame app.NtEditField_2.Value]);
-                    app.Tdata_cube=reshape(temp_Tdata_cube,[app.hSI.hRoiManager.pixelsPerLine/app.NtEditField_2.Value app.hSI.hRoiManager.linesPerFrame app.NtEditField_2.Value]);
+                    temp_data_cube_raw(app.NyEditField_2.Value*app.NxEditField_2.Value,:)=zeros(1,app.NtEditField_2.Value);
+                    temp_data_cube_transm(app.NyEditField_2.Value*app.NxEditField_2.Value,:)=zeros(1,app.NtEditField_2.Value);
+                    app.data_cube_raw=reshape(temp_data_cube_raw,[app.scanimage.hRoiManager.pixelsPerLine/app.NtEditField_2.Value app.scanimage.hRoiManager.linesPerFrame app.NtEditField_2.Value]);
+                    app.data_cube_transm=reshape(temp_data_cube_transm,[app.scanimage.hRoiManager.pixelsPerLine/app.NtEditField_2.Value app.scanimage.hRoiManager.linesPerFrame app.NtEditField_2.Value]);
                 otherwise
             end
         end
            
         %% Startup Function :
         function start_up_values(app)
+            app.add_to_log(app,'Setting values..')
 
             % Initialisation of Parameters for image and timing controls
-            app.Pix_equal_line_check=0;
-            app.StateEditField.Value=app.hSI.acqState;
+            app.is_pixel_line_equal=0;
+            app.StateEditField.Value=app.scanimage.acqState;
             set(app.Lamp_State)
 
             %  Initialize app fields from scan Image
-            app.PixelLineEditField.Value=app.hSI.hRoiManager.pixelsPerLine;
-            app.LinesFrameEditField.Value=app.hSI.hRoiManager.linesPerFrame;
-            app.SamplingRateMHzEditField.Value=app.hSI.hScan2D.sampleRate/1e6;
-            app.Pixel_bin_factor2.Value=app.hSI.hScan2D.pixelBinFactor;
-            app.FrameRateEditField.Value=app.hSI.hRoiManager.scanFrameRate;
-            app.PixelDwelltimeEditField.Value=app.hSI.hScan2D.scanPixelTimeMean*1e9;
-            app.hSI.hRoiManager.scanZoomFactor=3798./str2double(app.FoVmEditField.Value);
-            %TEST : app.hSI.hRoiManager.scanZoomFactor = app.ScanzoomfactorEditField.Value;
+            app.PixelLineEditField.Value=app.scanimage.hRoiManager.pixelsPerLine;
+            app.LinesFrameEditField.Value=app.scanimage.hRoiManager.linesPerFrame;
+            app.SamplingRateMHzEditField.Value=app.scanimage.hScan2D.sampleRate/1e6;
+            app.Pixel_bin_factor2.Value=app.scanimage.hScan2D.pixelBinFactor;
+            app.FrameRateEditField.Value=app.scanimage.hRoiManager.scanFrameRate;
+            app.PixelDwelltimeEditField.Value=app.scanimage.hScan2D.scanPixelTimeMean*1e9;
+            app.scanimage.hRoiManager.scanZoomFactor=3798./str2double(app.FoVmEditField.Value);
+            %TEST : app.scanimage.hRoiManager.scanZoomFactor = app.ScanzoomfactorEditField.Value;
 
             % GUI parameters
-            app.hSI.hChannels.channelDisplay=[2 3 4 ];
-            %TEST : app.hSI.hChannels.channelDisplay=app.ChannelsDisplayListBox.Value;
+            app.scanimage.hChannels.channelDisplay=[2 3 4 ];
+            %TEST : app.scanimage.hChannels.channelDisplay=app.ChannelsDisplayListBox.Value;
             app.initialize_Acq_panel(app)
 
             % startup parameters
             assignin('base', 'Xpos', app.XposSpinner.Value)
             assignin('base', 'Ypos', app.YposSpinner.Value)
-            app.hSICtl.hMotorControls.xyIncrement = 10;
-            %TEST : app.hSICtl.hMotorControls.xyIncrement = app.xyIncrementEditField.Value;
-            app.XposSpinner.Value=app.hSI.hMotors.samplePosition(1);
-            app.YposSpinner.Value=app.hSI.hMotors.samplePosition(2);
+            app.scanimage_controls.hMotorControls.xyIncrement = 10;
+            %TEST : app.scanimage_controls.hMotorControls.xyIncrement = app.xyIncrementEditField.Value;
+            app.XposSpinner.Value=app.scanimage.hMotors.samplePosition(1);
+            app.YposSpinner.Value=app.scanimage.hMotors.samplePosition(2);
             app.XposSpinner.Step = 10;
             %TEST :  app.XposSpinner.Step = app.xstepspinnerEditField.Value;
             app.YposSpinner.Step = 10;
             %TEST :  app.YposSpinner.Step = app.ystepspinnerEditField.Value;
-            app.NyEditField_2.Value=app.hSI.hRoiManager.linesPerFrame;
-            app.NxEditField_2.Value=app.hSI.hRoiManager.pixelsPerLine;
+            app.NyEditField_2.Value=app.scanimage.hRoiManager.linesPerFrame;
+            app.NxEditField_2.Value=app.scanimage.hRoiManager.pixelsPerLine;
             app.NtEditField_2.Value=1;
-            app.SamplingRateMHzEditField_3.Value=app.hSI.hScan2D.sampleRate/1e6;
-            app.PixelBinFactorEditField_3.Value=app.hSI.hScan2D.pixelBinFactor;
-            app.PixelDwelltimeEditField_3.Value=app.hSI.hScan2D.scanPixelTimeMean*1e9;
+            app.SamplingRateMHzEditField_3.Value=app.scanimage.hScan2D.sampleRate/1e6;
+            app.PixelBinFactorEditField_3.Value=app.scanimage.hScan2D.pixelBinFactor;
+            app.PixelDwelltimeEditField_3.Value=app.scanimage.hScan2D.scanPixelTimeMean*1e9;
             app.DazzlerTriggerFreqkHzEditField_2.Value=0;
             % TEST: app.DazzlerTriggerFreqkHzEditField_2.Value=app.DazzlerTriggerFreqkHzEditField.Value;
 
             % Ticks :
-            app.hSI.hRoiManager.forceSquarePixelation=0;
-            app.hSI.hScan2D.bidirectional=0;
-            app.hSI.hScan2D.stripingEnable=0;
-            app.hSI.hRoiManager.forceSquarePixels=0;
+            app.scanimage.hRoiManager.forceSquarePixelation=0;
+            app.scanimage.hScan2D.bidirectional=0;
+            app.scanimage.hScan2D.stripingEnable=0;
+            app.scanimage.hRoiManager.forceSquarePixels=0;
 
             % Figures correct :
             app.XY_Image.YLim=[1 app.NyEditField_2.Value];
@@ -624,20 +660,22 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         end
     
         function start_scan_image(app)
+            app.add_to_log(app,'Waiting for Scan Image...')
             addpath(genpath('C:\Program Files\Vidrio\SI2022.0.0_2022-08-25-164140_29e163d768'))
-            [app.hSI,app.hSICtl] = scanimage;
+            [app.scanimage,app.scanimage_controls] = scanimage;
+            app.add_to_log(app,'Scan Image Ready')
         end
 
         function start_listener(app)
             % Set our XYZ position to be the ones from scanImage and follow changes
-            addlistener(app.hSI.hMotors,'samplePosition','PostSet', @app.XposSpinner.ValueChangedFcn)
+            addlistener(app.scanimage.hMotors,'samplePosition','PostSet', @app.XposSpinner.ValueChangedFcn)
 
             % Listener
-            app.FrameRate_listener = listener(app.hSI.hRoiManager,'scanFrameRate','PostSet', @(src, evt) app.update_field(app.FrameRateEditField,'Value', app.hSI.hRoiManager.scanFrameRate));
-            app.Acq_state_listener = listener(app.hSI,'acqState','PreSet', @(src, evt) app.update_value(app,'Acq_Pre', app.hSI.acqState));
-            app.Acq_state_listenerGUI=listener(app.hSI,'acqState','PostSet', @(src, evt) app.acquisition_state(app));
-            app.Channel_listener = listener(app.hSI.hStackManager,'framesDone','PostSet', @(src, evt) app.updateChannels(app));
-            app.Dwell_Time_listener= listener(app.hSI.hScan2D,'scanPixelTimeMean','PostSet', @(src, evt) app.update_field(app.PixelDwelltimeEditField_3,'Value', app.hSI.hScan2D.scanPixelTimeMean*1e9));
+            app.FrameRate_listener = listener(app.scanimage.hRoiManager,'scanFrameRate','PostSet', @(src, evt) app.update_field(app.FrameRateEditField,'Value', app.scanimage.hRoiManager.scanFrameRate));
+            app.Acq_state_listener = listener(app.scanimage,'acqState','PreSet', @(src, evt) app.update_value(app,'acq_pre', app.scanimage.acqState));
+            app.Acq_state_listenerGUI=listener(app.scanimage,'acqState','PostSet', @(src, evt) app.acquisition_state(app));
+            app.Channel_listener = listener(app.scanimage.hStackManager,'framesDone','PostSet', @(src, evt) app.updateChannels(app));
+            app.Dwell_Time_listener= listener(app.scanimage.hScan2D,'scanPixelTimeMean','PostSet', @(src, evt) app.update_field(app.PixelDwelltimeEditField_3,'Value', app.scanimage.hScan2D.scanPixelTimeMean*1e9));
             app.add_to_log(app,'Microscope Ready')
         end
     
@@ -740,9 +778,9 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         end
         
         function acquisition_state(app)
-            app.update_value(app,'Acq_Post', app.hSI.acqState);
-            app.update_field(app.StateEditField,'Value', app.hSI.acqState)
-            switch [app.Acq_Pre '_to_' app.Acq_Post]
+            app.update_value(app,'acq_post', app.scanimage.acqState);
+            app.update_field(app.StateEditField,'Value', app.scanimage.acqState)
+            switch [app.acq_pre '_to_' app.acq_post]
                 case 'idle_to_grab'
                     set(app.GRABButton,'Enable',0)
                     set(app.GRABButton,'Visible',0)
@@ -789,10 +827,10 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         function startupFcn(app)
             addpath "C:\Users\scanimage\Desktop"
             app.add_to_log(app,'Starting App...')
+
             % Start Scan_Image
-            app.add_to_log(app,'Waiting for Scan Image...')
             app.start_scan_image(app)
-            app.add_to_log(app,'Scan Image Ready')
+
             app.start_up_values(app)
            
             % Start the Dazzlers
@@ -800,7 +838,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             app.add_to_log(app,'Initialize wave generators')
 
             % Initialize the list of UIaxes that we have :
-            app.liste_UIAxes=[app.XY_Image app.XY_Transmission app.UIAxes_4];
+            app.liste_UI_axes=[app.XY_Image app.XY_Transmission app.UIAxes_4];
             app.updateChannels(app);
 
             %TODO: Listener description
@@ -834,9 +872,9 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             value = app.XposSpinner.Value;
             coord = evalin('base', 'Xpos');
             if coord < value
-                app.hSICtl.hMotorControls.incrementAxis(1,+1)
+                app.scanimage_controls.hMotorControls.incrementAxis(1,+1)
             elseif coord > value
-                app.hSICtl.hMotorControls.incrementAxis(1,-1)
+                app.scanimage_controls.hMotorControls.incrementAxis(1,-1)
             end
             assignin('base', 'Xpos', value);
         end
@@ -845,7 +883,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         function XYstepsizeDropDownValueChanged(app, event)
             value = split(app.XYstepsizeDropDown.Value);
             value = str2double(value{1});
-            app.hSICtl.hMotorControls.xyIncrement = value;
+            app.scanimage_controls.hMotorControls.xyIncrement = value;
             app.XposSpinner.Step = value;
             app.YposSpinner.Step = value;
             assignin('base','xstepsize',app.XYstepsizeDropDown.Value);
@@ -857,44 +895,44 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             %ystepsize = app.YposSpinner.Step;
             coord = evalin('base', 'Ypos');
             if coord < value
-                app.hSICtl.hMotorControls.incrementAxis(2,+1)
+                app.scanimage_controls.hMotorControls.incrementAxis(2,+1)
             elseif coord > value
-                app.hSICtl.hMotorControls.incrementAxis(2,-1)
+                app.scanimage_controls.hMotorControls.incrementAxis(2,-1)
             end
             assignin('base', 'Ypos', value);
         end
 
         % Button pushed function: HomeXButton
         function HomeXButtonPushed(app, event)
-            app.hSICtl.hMotorControls.xyIncrement = abs(app.hSI.hMotors.samplePosition(1));
-            app.hSICtl.hMotorControls.incrementAxis(1,-sign(app.hSI.hMotors.samplePosition(1)))
+            app.scanimage_controls.hMotorControls.xyIncrement = abs(app.scanimage.hMotors.samplePosition(1));
+            app.scanimage_controls.hMotorControls.incrementAxis(1,-sign(app.scanimage.hMotors.samplePosition(1)))
             app.XposSpinner.Value = 0;
             assignin('base', 'Xpos', 0);
-            app.hSICtl.hMotorControls.xyIncrement = app.XposSpinner.Step;
+            app.scanimage_controls.hMotorControls.xyIncrement = app.XposSpinner.Step;
         end
 
         % Button pushed function: HomeYButton
         function HomeYButtonPushed(app, event)
-            app.hSICtl.hMotorControls.xyIncrement = abs(app.hSI.hMotors.samplePosition(2));
-            app.hSICtl.hMotorControls.incrementAxis(2,-sign(app.hSI.hMotors.samplePosition(2)))
+            app.scanimage_controls.hMotorControls.xyIncrement = abs(app.scanimage.hMotors.samplePosition(2));
+            app.scanimage_controls.hMotorControls.incrementAxis(2,-sign(app.scanimage.hMotors.samplePosition(2)))
             app.YposSpinner.Value = 0;
             assignin('base', 'Ypos', 0);
-            app.hSICtl.hMotorControls.xyIncrement = app.XposSpinner.Step;
+            app.scanimage_controls.hMotorControls.xyIncrement = app.XposSpinner.Step;
         end
 
         % Value changed function: PixLinCheckBox
         function PixLinCheckBoxValueChanged(app, event)
             value = app.PixLinCheckBox.Value;
-            app.Pix_equal_line_check=value;
+            app.is_pixel_line_equal=value;
             if value==1
-                app.hSI.hRoiManager.forceSquarePixelation=1;
+                app.scanimage.hRoiManager.forceSquarePixelation=1;
                 app.NyEditField_2.Value=app.NxEditField_2.Value;
-                app.hSI.hRoiManager.linesPerFrame=app.hSI.hRoiManager.pixelsPerLine;
+                app.scanimage.hRoiManager.linesPerFrame=app.scanimage.hRoiManager.pixelsPerLine;
                 app.LinesFrameEditField.Value=app.PixelLineEditField.Value;
                 app.update_field(app.LinesFrameEditField,'Editable',0)
                 app.update_field(app.NyEditField_2,'Editable',0)
             else
-                app.hSI.hRoiManager.forceSquarePixelation=0;
+                app.scanimage.hRoiManager.forceSquarePixelation=0;
             end
         end
 
@@ -902,22 +940,22 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         function NxEditField_2ValueChanged(app, event)
             value = app.NxEditField_2.Value;
             app.PixelLineEditField.Value=value;
-            if app.Pix_equal_line_check==1
+            if app.is_pixel_line_equal==1
                 app.NyEditField_2.Value=app.NxEditField_2.Value;
-                app.hSI.hRoiManager.linesPerFrame=app.hSI.hRoiManager.pixelsPerLine;
+                app.scanimage.hRoiManager.linesPerFrame=app.scanimage.hRoiManager.pixelsPerLine;
                 app.LinesFrameEditField.Value=app.PixelLineEditField.Value;
             end
-            app.hSI.hRoiManager.pixelsPerLine=value*app.NtEditField_2.Value;
+            app.scanimage.hRoiManager.pixelsPerLine=value*app.NtEditField_2.Value;
         end
 
         % Value changed function: PixelLineEditField
         function PixelLineEditFieldValueChanged(app, event)
             value = app.PixelLineEditField.Value;
-            app.hSI.hRoiManager.pixelsPerLine=value;
+            app.scanimage.hRoiManager.pixelsPerLine=value;
             app.NxEditField_2.Value=value;
-            if app.Pix_equal_line_check==1
+            if app.is_pixel_line_equal==1
                 app.NyEditField_2.Value=app.NxEditField_2.Value;
-                app.hSI.hRoiManager.linesPerFrame=app.hSI.hRoiManager.pixelsPerLine;
+                app.scanimage.hRoiManager.linesPerFrame=app.scanimage.hRoiManager.pixelsPerLine;
                 app.LinesFrameEditField.Value=app.PixelLineEditField.Value;
             end
         end
@@ -925,18 +963,18 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         % Value changed function: NyEditField_2
         function NyEditField_2ValueChanged(app, event)
             value = app.NyEditField_2.Value;
-            if app.Pix_equal_line_check==0
+            if app.is_pixel_line_equal==0
                 app.LinesFrameEditField.Value=value;
-              app.hSI.hRoiManager.linesPerFrame=value;
+              app.scanimage.hRoiManager.linesPerFrame=value;
             end
         end
 
         % Value changed function: LinesFrameEditField
         function LinesFrameEditFieldValueChanged(app, event)
             value = app.LinesFrameEditField.Value;
-            if app.Pix_equal_line_check==0
+            if app.is_pixel_line_equal==0
                 app.LinesFrameEditField.Value=value;
-                app.hSI.hRoiManager.linesPerFrame=value;
+                app.scanimage.hRoiManager.linesPerFrame=value;
                 app.NyEditField_2.Value=value;
             end
         end
@@ -944,16 +982,16 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         % Close request function: UIFigure
         function UIFigureCloseRequest(app, event)
 
-            if isprop(app,'hSI') && ~isequal(app.hSI,[])
-                if iscell(app.waveformGenerators)
-                    for ii=1:size(app.waveformGenerators,2)
+            if isprop(app,'scanimage') && ~isequal(app.scanimage,[])
+                if iscell(app.waveform_generators)
+                    for ii=1:size(app.waveform_generators,2)
                         app.WG(ii).wavegen.wvfrmFcn='square';
                         app.WG(ii).widget.redraw();
                     end
                 else
                     app.WG.wavegen.wvfrmFcn = 'square';
                 end
-                app.hSICtl.exit()
+                app.scanimage_controls.exit()
             end
 
             % release motors
@@ -970,9 +1008,9 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
 
         % Button pushed function: GRABButton
         function GRABButtonPushed(app, event)
-            switch app.hSI.acqState
+            switch app.scanimage.acqState
                 case 'idle'
-                    app.hSI.startGrab();
+                    app.scanimage.startGrab();
                 case 'focus'
                     disp('Acquisition Not Idle')
                 case 'grab'
@@ -983,9 +1021,9 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         % Button pushed function: FOCUSButton
         function FOCUSButtonPushed(app, event)
 
-            switch app.hSI.acqState
+            switch app.scanimage.acqState
                 case 'idle'
-                    app.hSI.startFocus();
+                    app.scanimage.startFocus();
                 case 'focus'
                     disp('Acquisition Not Idle')
                 case 'grab'
@@ -996,7 +1034,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         % Button pushed function: ABORTButton
         function ABORTButtonPushed(app, event)
 
-            switch app.hSI.acqState
+            switch app.scanimage.acqState
                 case 'idle'
                     disp('Acquisition IS Idle')
                     set(app.GRABButton,'Enable',1)
@@ -1006,7 +1044,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
                     set(app.ABORTButton,'Enable',0)
                     set(app.ABORTButton,'Visible',0)
                 case 'focus'
-                    app.hSICtl.abortButton();
+                    app.scanimage_controls.abortButton();
                     set(app.GRABButton,'Enable',1)
                     set(app.GRABButton,'Visible',1)
                     set(app.FOCUSButton,'Enable',1)
@@ -1015,7 +1053,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
                     set(app.ABORTButton,'Visible',0)
                     set(app.Lamp_State,'Color','red')
                 case 'grab'
-                    app.hSICtl.abortButton();
+                    app.scanimage_controls.abortButton();
                     set(app.GRABButton,'Enable',1)
                     set(app.GRABButton,'Visible',1)
                     set(app.FOCUSButton,'Enable',1)
@@ -1050,7 +1088,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
 
         % Button pushed function: UploadparametersButton_3
         function UploadparametersButtonPushed(app, event)
-            fields=app.waves_DZ(1).wave_fields;
+            fields=app.waves_dz(1).wave_fields;
             %% WROONG WRONG
             value=[0 app.PositionEditField.Value app.BandwidthEditField.Value app.HolePositionEditField.Value app.HoleWidthEditField.Value ...
                 app.HoleDepthSlider.Value app.PowerSlider.Value app.DelayEditField.Value app.order2EditField.Value app.order3EditField.Value app.order4EditField.Value];
@@ -1059,7 +1097,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
 
         % Button pushed function: UploadparametersButton_4
         function UploadparametersButton_2Pushed(app, event)
-            fields=app.waves_DZ(1).wave_fields;
+            fields=app.waves_dz(1).wave_fields;
 
             value=[app.PositionEditField_2.Value app.BandwidthEditField_2.Value app.HolePositionEditField_2.Value app.HoleWidthEditField_2.Value ...
                 app.HoleDepthSlider_2.Value app.PowerSlider_2.Value app.DelayEditField_2.Value app.order2EditField_2.Value app.order3EditField_2.Value app.order4EditField_2.Value];
@@ -1069,7 +1107,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         % Value changed function: FoVmEditField
         function FoVmEditFieldValueChanged(app, event)
             value = str2double(app.FoVmEditField.Value);
-            app.hSI.hRoiManager.scanZoomFactor=3798/value;
+            app.scanimage.hRoiManager.scanZoomFactor=3798/value;
         end
 
         % Value changed function: ChannelDropDown_3
@@ -1090,9 +1128,9 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
                     temp_step=str2double(erase(app.XYstepsizeDropDown.Value,' um'));
                     coord = evalin('base', 'Xpos');
                     if coord < app.XposSpinner.Value-temp_step
-                        app.hSICtl.hMotorControls.incrementAxis(1,+1)
+                        app.scanimage_controls.hMotorControls.incrementAxis(1,+1)
                     elseif coord > app.XposSpinner.Value-temp_step
-                        app.hSICtl.hMotorControls.incrementAxis(1,-1)
+                        app.scanimage_controls.hMotorControls.incrementAxis(1,-1)
                     end
                     assignin('base', 'Xpos', app.XposSpinner.Value-temp_step);
                     app.XposSpinner.Value=app.XposSpinner.Value-temp_step;
@@ -1102,9 +1140,9 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
                     temp_step=str2double(erase(app.XYstepsizeDropDown.Value,' um'));
                     coord = evalin('base', 'Ypos');
                     if coord < app.YposSpinner.Value-temp_step
-                        app.hSICtl.hMotorControls.incrementAxis(2,+1)
+                        app.scanimage_controls.hMotorControls.incrementAxis(2,+1)
                     elseif coord > app.YposSpinner.Value-temp_step
-                        app.hSICtl.hMotorControls.incrementAxis(2,-1)
+                        app.scanimage_controls.hMotorControls.incrementAxis(2,-1)
                     end
                     assignin('base', 'Ypos', app.YposSpinner.Value-temp_step);
                     app.YposSpinner.Value=app.YposSpinner.Value-temp_step;
@@ -1113,9 +1151,9 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
                     temp_step=str2double(erase(app.XYstepsizeDropDown.Value,' um'));
                     coord = evalin('base', 'Ypos');
                     if coord < app.YposSpinner.Value+temp_step
-                        app.hSICtl.hMotorControls.incrementAxis(2,+1)
+                        app.scanimage_controls.hMotorControls.incrementAxis(2,+1)
                     elseif coord > app.YposSpinner.Value+temp_step
-                        app.hSICtl.hMotorControls.incrementAxis(2,-1)
+                        app.scanimage_controls.hMotorControls.incrementAxis(2,-1)
                     end
                     assignin('base', 'Ypos', app.YposSpinner.Value+temp_step);
                     app.YposSpinner.Value=app.YposSpinner.Value+temp_step;
@@ -1124,9 +1162,9 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
                     temp_step=str2double(erase(app.XYstepsizeDropDown.Value,' um'));
                     coord = evalin('base', 'Xpos');
                     if coord < app.XposSpinner.Value+temp_step
-                        app.hSICtl.hMotorControls.incrementAxis(1,+1)
+                        app.scanimage_controls.hMotorControls.incrementAxis(1,+1)
                     elseif coord > app.XposSpinner.Value+temp_step
-                        app.hSICtl.hMotorControls.incrementAxis(1,-1)
+                        app.scanimage_controls.hMotorControls.incrementAxis(1,-1)
                     end
                     assignin('base', 'Xpos', app.XposSpinner.Value+temp_step);
                     app.XposSpinner.Value=app.XposSpinner.Value+temp_step;
@@ -1155,7 +1193,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         function SamplingRateMHzEditField_3ValueChanged(app, event)
             value = app.SamplingRateMHzEditField_3.Value;
             if value< 126
-                app.hSI.hScan2D.sampleRate=value*1e6;
+                app.scanimage.hScan2D.sampleRate=value*1e6;
             end
             app.SamplingRateMHzEditField.Value=value;
         end
@@ -1164,7 +1202,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         function SamplingRateMHzEditFieldValueChanged(app, event)
             value = app.SamplingRateMHzEditField.Value;
             if value< 126
-                app.hSI.hScan2D.sampleRate=value*1e6;
+                app.scanimage.hScan2D.sampleRate=value*1e6;
             end
             app.SamplingRateMHzEditField_3.Value=value;
         end
@@ -1172,20 +1210,20 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         % Value changed function: PixelBinFactorEditField_3
         function PixelBinFactorEditField_3ValueChanged(app, event)
             value = app.PixelBinFactorEditField_3.Value;
-            app.hSI.hScan2D.pixelBinFactor=value;
+            app.scanimage.hScan2D.pixelBinFactor=value;
             app.Pixel_bin_factor2.Value=value;
         end
 
         % Value changed function: Pixel_bin_factor2
         function Pixel_bin_factor2ValueChanged(app, event)
             value = app.Pixel_bin_factor2.Value;
-            app.hSI.hScan2D.pixelBinFactor=value;
+            app.scanimage.hScan2D.pixelBinFactor=value;
             app.PixelBinFactorEditField_3.Value=value;
         end
 
         % Callback function
         function StartButtonPushed(app, event)
-            app.WG(app.WG_Chosen(1)).widget.hResource.startTask()
+            app.WG(app.WG_chosen(1)).widget.hResource.startTask()
 
         end
 
@@ -1276,21 +1314,21 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         % Menu selected function: TransmissionImageMenu
         function TransmissionImageMenuSelected(app, event)
              % Set the bidirectionnal scan/square_pix/pix=line
-            app.hSI.hRoiManager.forceSquarePixels=1;
-            app.Pix_equal_line_check=1;
+            app.scanimage.hRoiManager.forceSquarePixels=1;
+            app.is_pixel_line_equal=1;
             % Set X&Y
             value = app.NxEditField_2.Value;
             app.PixelLineEditField.Value=value;
-            app.hSI.hRoiManager.pixelsPerLine=value;
-            if app.Pix_equal_line_check==1
+            app.scanimage.hRoiManager.pixelsPerLine=value;
+            if app.is_pixel_line_equal==1
                 app.NyEditField_2.Value=app.NxEditField_2.Value;
-                app.hSI.hRoiManager.linesPerFrame=app.hSI.hRoiManager.pixelsPerLine;
+                app.scanimage.hRoiManager.linesPerFrame=app.scanimage.hRoiManager.pixelsPerLine;
                 app.LinesFrameEditField.Value=app.PixelLineEditField.Value;
             end
             % temporal spatial ?
             % sample rate and binning.
-            app.hSI.hScan2D.sampleRate=0.625e6;
-            app.hSI.hScan2D.pixelBinFactor=20;
+            app.scanimage.hScan2D.sampleRate=0.625e6;
+            app.scanimage.hScan2D.pixelBinFactor=20;
             % To Do : Wave gen !
             %
             app.add_to_log(app,'Ready for transmission')
@@ -1299,10 +1337,10 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         % Menu selected function: DazzlerSpectroscopyMenu
         function DazzlerSpectroscopyMenuSelected(app, event)
             % Set the bidirectionnal scan/square_pix/pix=line
-            app.hSI.hScan2D.bidirectional=0;
-            app.hSI.hRoiManager.forceSquarePixels=0;
-            app.Pix_equal_line_check=0;
-            app.hSI.hRoiManager.forceSquarePixelation=0;
+            app.scanimage.hScan2D.bidirectional=0;
+            app.scanimage.hRoiManager.forceSquarePixels=0;
+            app.is_pixel_line_equal=0;
+            app.scanimage.hRoiManager.forceSquarePixelation=0;
             % Set X&Y
             app.NxEditField_2.Value=64;
 
@@ -1319,22 +1357,22 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             app.UIAxes_4.XLim=[1 app.NxEditField_2.Value*app.NtEditField_2.Value];
             app.UIAxes_4.DataAspectRatio=[app.NtEditField_2.Value 1 1];
 
-            app.hSI.hRoiManager.pixelsPerLine=app.NxEditField_2.Value*app.NtEditField_2.Value;
-            app.hSI.hRoiManager.linesPerFrame=app.NyEditField_2.Value;
+            app.scanimage.hRoiManager.pixelsPerLine=app.NxEditField_2.Value*app.NtEditField_2.Value;
+            app.scanimage.hRoiManager.linesPerFrame=app.NyEditField_2.Value;
             % temporal spatial ?
 
-            %             app.hSI.hScan2d.fillFractionSpatial=0.999;
+            %             app.scanimage.hScan2d.fillFractionSpatial=0.999;
             % sample rate and binning.
-            app.hSI.hScan2D.sampleRate=10e6;
+            app.scanimage.hScan2D.sampleRate=10e6;
             app.SamplingRateMHzEditField.Value=10;
             app.SamplingRateMHzEditField_3.Value=10;
             app.SamplingRateMHzEditField.Value=10e6;
-            app.hSI.hScan2D.pixelBinFactor=1;
+            app.scanimage.hScan2D.pixelBinFactor=1;
             app.Pixel_bin_factor2.Value=1;
             app.PixelBinFactorEditField_3.Value=1;
 
             % To slow it down : Frame flyback
-            app.hSI.hScan2D.flybackTimePerFrame=201e-3; % in seconds, 201 ms is good
+            app.scanimage.hScan2D.flybackTimePerFrame=201e-3; % in seconds, 201 ms is good
 
             % To Do !
             % Wave gen
@@ -1366,10 +1404,10 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
         % Menu selected function: RandomAccessDelayMenu
         function RandomAccessDelayMenuSelected(app, event)
             % Set the bidirectionnal scan/square_pix/pix=line
-            app.hSI.hScan2D.bidirectional=0;
-            app.hSI.hRoiManager.forceSquarePixels=0;
-            app.Pix_equal_line_check=0;
-            app.hSI.hRoiManager.forceSquarePixelation=0;
+            app.scanimage.hScan2D.bidirectional=0;
+            app.scanimage.hRoiManager.forceSquarePixels=0;
+            app.is_pixel_line_equal=0;
+            app.scanimage.hRoiManager.forceSquarePixelation=0;
             % Set X&Y
             app.NxEditField_2.Value=50;
 
@@ -1386,22 +1424,22 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             app.UIAxes_4.XLim=[1 app.NxEditField_2.Value*app.NtEditField_2.Value];
             app.UIAxes_4.DataAspectRatio=[app.NtEditField_2.Value 1 1];
 
-            app.hSI.hRoiManager.pixelsPerLine=app.NxEditField_2.Value*app.NtEditField_2.Value;
-            app.hSI.hRoiManager.linesPerFrame=app.NyEditField_2.Value;
+            app.scanimage.hRoiManager.pixelsPerLine=app.NxEditField_2.Value*app.NtEditField_2.Value;
+            app.scanimage.hRoiManager.linesPerFrame=app.NyEditField_2.Value;
             % temporal spatial ?
 
-            %             app.hSI.hScan2d.fillFractionSpatial=0.999;
+            %             app.scanimage.hScan2d.fillFractionSpatial=0.999;
             % sample rate and binning.
-            app.hSI.hScan2D.sampleRate=1.25e6;
+            app.scanimage.hScan2D.sampleRate=1.25e6;
             app.SamplingRateMHzEditField.Value=1.25;
             app.SamplingRateMHzEditField_3.Value=1.25;
             app.SamplingRateMHzEditField.Value=1.25e6;
-            app.hSI.hScan2D.pixelBinFactor=25;
+            app.scanimage.hScan2D.pixelBinFactor=25;
             app.Pixel_bin_factor2.Value=25;
             app.PixelBinFactorEditField_3.Value=25;
 
             % To slow it down : Frame flyback
-            app.hSI.hScan2D.flybackTimePerFrame=1e-3; % in seconds, 201 ms is good
+            app.scanimage.hScan2D.flybackTimePerFrame=1e-3; % in seconds, 201 ms is good
 
             % To Do !
             % Wave gen
@@ -1431,8 +1469,8 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             value = app.SaveImageCheckBox.Value;
             switch value
                 case true
-                    app.hSI.hChannels.loggingEnable=1;
-                    app.hSI.hChannels.ChannelSave=[2 3 4];
+                    app.scanimage.hChannels.loggingEnable=1;
+                    app.scanimage.hChannels.ChannelSave=[2 3 4];
                     app.add_to_log('Verify APE parameters for proper data naming')
                     Param_laser=['_Laser_OPO_power_' num2str(app.OPOPowermWEditField.Value) '_mW_TiSf_Power_' num2str(app.Ti_SfPowermWEditField.Value) 'mW'];
                     Param_APE=['_APE_Phase'  '_Offset_'  '_Gain_' '_tau_' '_ns_'];
@@ -1440,31 +1478,43 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
                     app.add_to_log(Param_laser)
 
                 case false
-                    app.hSI.hChannels.loggingEnable=0;
-                    app.hSI.hChannels.ChannelSave=[];
+                    app.scanimage.hChannels.loggingEnable=0;
+                    app.scanimage.hChannels.ChannelSave=[];
             end
         end
 
         % Value changed function: AverageEditField
         function AverageEditFieldValueChanged(app, event)
             value = app.AverageEditField.Value;
-            app.hSI.hScan2D.logAverageFactor=value;
+            app.scanimage.hScan2D.logAverageFactor=value;
         end
 
         % Button pushed function: ChooseFolderButton
         function ChooseFolderButtonPushed(app, event)
-            app.save_path=uigetdir();            
-            d = datetime(now,'ConvertFrom','datenum');
+            save_path=uigetdir();            
+            d = datetime('now','ConvertFrom','datenum');
             d.Format='yyyy-MM-dd';
-            app.save_folder=string(d);
-            temp_path=[char(app.save_path) '\' char(d)];
+            save_folder=string(d);
+            temp_path=[char(save_path) '\' char(d)];
             if exist(temp_path,'dir')
                 mkdir(temp_path)
-                app.save_folder=temp_path;
+                save_folder=temp_path;
             else
-                app.save_folder=temp_path;
+                save_folder=temp_path;
             end
-            app.hSI.hScan2D.logFilePath=app.save_folder;
+            app.scanimage.hScan2D.logFilePath=save_folder;
+        end
+
+        % Button pushed function: ROIButton
+        function ROIButtonPushed(app, event)
+            h1 = figure('Name','Select the desired pixel polygon:');
+            imagesc(app.XY_Transmission)            %Image of transmission
+            colormap('hot')
+            mask = roipoly; %mask made by user
+            close(h1);
+            RP = RP.make_raman_spectrum_with_mask(mask); %make ramanspectrum with mask
+
+            plot(); %make Raman Spec of ROI
         end
     end
 
@@ -1534,7 +1584,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             ylabel(app.XY_Transmission, 'Y')
             zlabel(app.XY_Transmission, 'Z')
             app.XY_Transmission.XLim = [0 1];
-            app.XY_Transmission.Position = [452 114 364 324];
+            app.XY_Transmission.Position = [451 64 364 324];
 
             % Create Time_average
             app.Time_average = uiaxes(app.ImagingTab);
@@ -1559,7 +1609,14 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             ylabel(app.UIAxes_4, 'Y')
             zlabel(app.UIAxes_4, 'Z')
             app.UIAxes_4.XLim = [0 1];
-            app.UIAxes_4.Position = [859 117 407 366];
+            app.UIAxes_4.Position = [852 64 407 366];
+
+            % Create Freq
+            app.Freq = uiaxes(app.ImagingTab);
+            xlabel(app.Freq, 'X')
+            ylabel(app.Freq, 'Y')
+            zlabel(app.Freq, 'Z')
+            app.Freq.Position = [874 493 375 179];
 
             % Create MotorControlsXYZDelayPanel
             app.MotorControlsXYZDelayPanel = uipanel(app.ImagingTab);
@@ -1964,26 +2021,26 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             % Create ChannelDropDown_2Label
             app.ChannelDropDown_2Label = uilabel(app.ImagingTab);
             app.ChannelDropDown_2Label.HorizontalAlignment = 'right';
-            app.ChannelDropDown_2Label.Position = [575 462 65 22];
+            app.ChannelDropDown_2Label.Position = [574 412 65 22];
             app.ChannelDropDown_2Label.Text = 'Channel';
 
             % Create ChannelDropDown_2
             app.ChannelDropDown_2 = uidropdown(app.ImagingTab);
             app.ChannelDropDown_2.Items = {'1', '2', '3', '4', 'Off'};
-            app.ChannelDropDown_2.Position = [649 462 44 22];
+            app.ChannelDropDown_2.Position = [648 412 44 22];
             app.ChannelDropDown_2.Value = '2';
 
             % Create ChannelDropDown_3Label
             app.ChannelDropDown_3Label = uilabel(app.ImagingTab);
             app.ChannelDropDown_3Label.HorizontalAlignment = 'right';
-            app.ChannelDropDown_3Label.Position = [979 532 65 22];
+            app.ChannelDropDown_3Label.Position = [972 449 65 22];
             app.ChannelDropDown_3Label.Text = 'Channel';
 
             % Create ChannelDropDown_3
             app.ChannelDropDown_3 = uidropdown(app.ImagingTab);
             app.ChannelDropDown_3.Items = {'1', '2', '3', '4', 'Off', 'Raman Active'};
             app.ChannelDropDown_3.ValueChangedFcn = createCallbackFcn(app, @ChannelDropDown_3ValueChanged, true);
-            app.ChannelDropDown_3.Position = [1053 532 122 22];
+            app.ChannelDropDown_3.Position = [1046 449 122 22];
             app.ChannelDropDown_3.Value = '1';
 
             % Create LogTextAreaLabel
@@ -2000,8 +2057,14 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             app.ShowDazzlerwindowCheckBox = uicheckbox(app.ImagingTab);
             app.ShowDazzlerwindowCheckBox.ValueChangedFcn = createCallbackFcn(app, @ShowDazzlerwindowCheckBoxValueChanged, true);
             app.ShowDazzlerwindowCheckBox.Text = 'Show Dazzler window';
-            app.ShowDazzlerwindowCheckBox.Position = [1004 588 139 22];
+            app.ShowDazzlerwindowCheckBox.Position = [1269 777 139 22];
             app.ShowDazzlerwindowCheckBox.Value = true;
+
+            % Create ROIButton
+            app.ROIButton = uibutton(app.ImagingTab, 'push');
+            app.ROIButton.ButtonPushedFcn = createCallbackFcn(app, @ROIButtonPushed, true);
+            app.ROIButton.Position = [599 24 100 23];
+            app.ROIButton.Text = 'ROI';
 
             % Create ParametersTab
             app.ParametersTab = uitab(app.TabGroup);
@@ -2568,81 +2631,75 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
             app.UploadparametersButton_4.Position = [223 39 118 23];
             app.UploadparametersButton_4.Text = 'Upload parameters';
 
-            % Create PostProcessingParametersTab
-            app.PostProcessingParametersTab = uitab(app.TabGroup);
-            app.PostProcessingParametersTab.AutoResizeChildren = 'off';
-            app.PostProcessingParametersTab.Title = 'Post Processing Parameters';
-
-            % Create InitialParametersTab
-            app.InitialParametersTab = uitab(app.TabGroup);
-            app.InitialParametersTab.Title = 'Initial Parameters';
-
-            % Create Panel
-            app.Panel = uipanel(app.InitialParametersTab);
-            app.Panel.Position = [41 707 118 124];
-
-            % Create ChannelsDisplayListBoxLabel
-            app.ChannelsDisplayListBoxLabel = uilabel(app.InitialParametersTab);
-            app.ChannelsDisplayListBoxLabel.HorizontalAlignment = 'right';
-            app.ChannelsDisplayListBoxLabel.Position = [50 808 98 22];
-            app.ChannelsDisplayListBoxLabel.Text = 'Channels Display';
-
-            % Create ChannelsDisplayListBox
-            app.ChannelsDisplayListBox = uilistbox(app.InitialParametersTab);
-            app.ChannelsDisplayListBox.Items = {'1', '2', '3', '4'};
-            app.ChannelsDisplayListBox.Multiselect = 'on';
-            app.ChannelsDisplayListBox.Position = [75 726 40 76];
-            app.ChannelsDisplayListBox.Value = {'1', '2', '3'};
+            % Create InitialParametersPanel
+            app.InitialParametersPanel = uipanel(app.ParametersTab);
+            app.InitialParametersPanel.AutoResizeChildren = 'off';
+            app.InitialParametersPanel.TitlePosition = 'centertop';
+            app.InitialParametersPanel.Title = 'Initial Parameters';
+            app.InitialParametersPanel.Position = [957 412 267 319];
 
             % Create ScanzoomfactorEditFieldLabel
-            app.ScanzoomfactorEditFieldLabel = uilabel(app.InitialParametersTab);
-            app.ScanzoomfactorEditFieldLabel.HorizontalAlignment = 'right';
-            app.ScanzoomfactorEditFieldLabel.Position = [41 645 98 22];
+            app.ScanzoomfactorEditFieldLabel = uilabel(app.InitialParametersPanel);
+            app.ScanzoomfactorEditFieldLabel.Position = [12 273 113 22];
             app.ScanzoomfactorEditFieldLabel.Text = 'Scan zoom factor';
 
             % Create ScanzoomfactorEditField
-            app.ScanzoomfactorEditField = uieditfield(app.InitialParametersTab, 'numeric');
-            app.ScanzoomfactorEditField.Position = [154 645 86 22];
+            app.ScanzoomfactorEditField = uieditfield(app.InitialParametersPanel, 'text');
+            app.ScanzoomfactorEditField.Position = [167 273 88 20];
 
             % Create xyIncrementEditFieldLabel
-            app.xyIncrementEditFieldLabel = uilabel(app.InitialParametersTab);
-            app.xyIncrementEditFieldLabel.HorizontalAlignment = 'right';
-            app.xyIncrementEditFieldLabel.Position = [41 613 101 22];
+            app.xyIncrementEditFieldLabel = uilabel(app.InitialParametersPanel);
+            app.xyIncrementEditFieldLabel.Position = [12 252 105 22];
             app.xyIncrementEditFieldLabel.Text = 'xy Increment';
 
             % Create xyIncrementEditField
-            app.xyIncrementEditField = uieditfield(app.InitialParametersTab, 'numeric');
-            app.xyIncrementEditField.Position = [157 613 86 22];
+            app.xyIncrementEditField = uieditfield(app.InitialParametersPanel, 'text');
+            app.xyIncrementEditField.Position = [167 252 88 20];
 
             % Create xstepspinnerEditFieldLabel
-            app.xstepspinnerEditFieldLabel = uilabel(app.InitialParametersTab);
-            app.xstepspinnerEditFieldLabel.HorizontalAlignment = 'right';
-            app.xstepspinnerEditFieldLabel.Position = [35 548 101 22];
+            app.xstepspinnerEditFieldLabel = uilabel(app.InitialParametersPanel);
+            app.xstepspinnerEditFieldLabel.Position = [12 231 80 22];
             app.xstepspinnerEditFieldLabel.Text = 'x step spinner';
 
             % Create xstepspinnerEditField
-            app.xstepspinnerEditField = uieditfield(app.InitialParametersTab, 'numeric');
-            app.xstepspinnerEditField.Position = [151 548 35 22];
+            app.xstepspinnerEditField = uieditfield(app.InitialParametersPanel, 'text');
+            app.xstepspinnerEditField.Position = [167 231 88 20];
 
             % Create ystepspinnerEditFieldLabel
-            app.ystepspinnerEditFieldLabel = uilabel(app.InitialParametersTab);
-            app.ystepspinnerEditFieldLabel.HorizontalAlignment = 'right';
-            app.ystepspinnerEditFieldLabel.Position = [35 515 101 22];
+            app.ystepspinnerEditFieldLabel = uilabel(app.InitialParametersPanel);
+            app.ystepspinnerEditFieldLabel.Position = [12 209 105 22];
             app.ystepspinnerEditFieldLabel.Text = 'y step spinner';
 
             % Create ystepspinnerEditField
-            app.ystepspinnerEditField = uieditfield(app.InitialParametersTab, 'numeric');
-            app.ystepspinnerEditField.Position = [151 515 35 22];
+            app.ystepspinnerEditField = uieditfield(app.InitialParametersPanel, 'text');
+            app.ystepspinnerEditField.Position = [167 209 88 20];
 
             % Create DazzlerTriggerFreqkHzEditFieldLabel
-            app.DazzlerTriggerFreqkHzEditFieldLabel = uilabel(app.InitialParametersTab);
-            app.DazzlerTriggerFreqkHzEditFieldLabel.HorizontalAlignment = 'right';
-            app.DazzlerTriggerFreqkHzEditFieldLabel.Position = [39 475 140 22];
+            app.DazzlerTriggerFreqkHzEditFieldLabel = uilabel(app.InitialParametersPanel);
+            app.DazzlerTriggerFreqkHzEditFieldLabel.Position = [12 185 136 22];
             app.DazzlerTriggerFreqkHzEditFieldLabel.Text = 'DazzlerTriggerFreq (kHz)';
 
             % Create DazzlerTriggerFreqkHzEditField
-            app.DazzlerTriggerFreqkHzEditField = uieditfield(app.InitialParametersTab, 'numeric');
-            app.DazzlerTriggerFreqkHzEditField.Position = [194 475 86 22];
+            app.DazzlerTriggerFreqkHzEditField = uieditfield(app.InitialParametersPanel, 'numeric');
+            app.DazzlerTriggerFreqkHzEditField.HorizontalAlignment = 'left';
+            app.DazzlerTriggerFreqkHzEditField.Position = [167 185 88 22];
+
+            % Create Panel
+            app.Panel = uipanel(app.InitialParametersPanel);
+            app.Panel.Position = [75 31 118 124];
+
+            % Create ChannelsDisplayListBoxLabel
+            app.ChannelsDisplayListBoxLabel = uilabel(app.Panel);
+            app.ChannelsDisplayListBoxLabel.HorizontalAlignment = 'right';
+            app.ChannelsDisplayListBoxLabel.Position = [8 92 98 22];
+            app.ChannelsDisplayListBoxLabel.Text = 'Channels Display';
+
+            % Create ChannelsDisplayListBox
+            app.ChannelsDisplayListBox = uilistbox(app.Panel);
+            app.ChannelsDisplayListBox.Items = {'1', '2', '3', '4'};
+            app.ChannelsDisplayListBox.Multiselect = 'on';
+            app.ChannelsDisplayListBox.Position = [33 10 40 76];
+            app.ChannelsDisplayListBox.Value = {'1'};
 
             % Show the figure after all components are created
             app.UIFigure.Visible = 'on';
@@ -2653,7 +2710,7 @@ classdef Time_Spectro_For_PUBLICATION_11_7_for_paulo < matlab.apps.AppBase
     methods (Access = public)
 
         % Construct app
-        function app = Time_Spectro_For_PUBLICATION_11_7_for_paulo
+        function app = Time_Spectro_For_PUBLICATION
 
             % Create UIFigure and components
             createComponents(app)
